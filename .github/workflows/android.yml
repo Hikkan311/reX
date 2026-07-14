@@ -10,38 +10,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Create local.properties (Telegram & reX Keys)
+      - name: Create local.properties
         run: |
           echo "telegram.api_id=8" > local.properties
           echo "telegram.api_hash=7245de8e747a0d6fbe11f7cc14fcc0bb" >> local.properties
           echo "app.ntgcalls=true" >> local.properties
 
-      - name: Run Telegram X Setup Script
+      - name: Build Project
         env:
           TERM: xterm
         run: |
-          if [ -f scripts/setup.sh ]; then
-            chmod +x scripts/setup.sh
-            bash scripts/setup.sh
-          fi
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+          chmod +x gradlew
+          ./gradlew clean assembleDebug --stacktrace --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
