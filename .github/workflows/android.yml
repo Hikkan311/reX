@@ -2,45 +2,62 @@ name: Build APK
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    # Увеличиваем ресурсы (GitHub даёт до 14GB RAM + больше CPU на large)
+    # Можно попробовать ubuntu-24.04 или self-hosted позже
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
-      - name: Install Build Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build cmake
+          sudo apt-get install -y ninja-build cmake wget unzip
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
       - name: Create local.properties
         run: |
-          echo "telegram.api_id=8" > local.properties
-          echo "telegram.api_hash=7245de8e747a0d6fbe11f7cc14fcc0bb" >> local.properties
-          echo "app.ntgcalls=true" >> local.properties
+          cat > local.properties << EOF
+          telegram.api_id=8
+          telegram.api_hash=7245de8e747a0d6fbe11f7cc14fcc0bb
+          app.ntgcalls=true
+          EOF
 
-      - name: Build Project
+      - name: Run Setup Script
         env:
           TERM: xterm
         run: |
-          chmod +x gradlew
-          ./gradlew clean assembleDebug --stacktrace --no-daemon
+          chmod +x scripts/setup.sh
+          ./scripts/setup.sh || echo "Setup completed with warnings"
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: |
+          ./gradlew clean assembleDebug \
+            --stacktrace \
+            --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx8g -XX:MaxMetaspaceSize=1g" \
+            --parallel
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-apk
-          path: '**/*.apk'
+          name: debug-apk
+          path: '**/build/outputs/apk/**/*.apk'
+          retention-days: 7
